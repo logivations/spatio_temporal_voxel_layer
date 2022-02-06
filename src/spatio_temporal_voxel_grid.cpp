@@ -293,10 +293,10 @@ void SpatioTemporalVoxelGrid::operator()(
       
       // if further away than 0.5m from center, only accept obstacles with min 8cm above ground
       // otherwise, as AMR is shaking, the ground is seen as obstacle
-      //float distance_y_2 = (*iter_y - obs._origin.y) * (*iter_y - obs._origin.y);      
-      //if (*iter_z < 0.08 && distance_y_2 > 0.25){
-      //  continue;
-      //}
+      float distance_y_2 = (*iter_y - obs._origin.y) * (*iter_y - obs._origin.y);      
+      if (*iter_z < 0.08 && distance_y_2 > 0.25){
+        continue;
+      }
       
       if (distance_2 > mark_range_2 || distance_2 < 0.0001) {
         continue;
