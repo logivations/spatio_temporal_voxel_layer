@@ -283,22 +283,6 @@ void SpatioTemporalVoxelGrid::operator()(
         (*iter_x - obs._origin.x) * (*iter_x - obs._origin.x) +
         (*iter_y - obs._origin.y) * (*iter_y - obs._origin.y) +
         (*iter_z - obs._origin.z) * (*iter_z - obs._origin.z);
-
-      // workaround for the kinect WFOV: remove obstacles behind the camera
-      // (the kinect can see the AMR itself)
-
-      // std::cout << "pos is " << obs._origin.x << std::endl;
-      float distance_x = (*iter_x - obs._origin.x) * (*iter_x - obs._origin.x);
-      if ((distance_x < 0.003 || ( distance_x < 0.01 && *iter_z > 0.08))){
-        continue;
-      }
-      
-      // if further away than 0.5m from center, only accept obstacles with min 8cm above ground
-      // otherwise, as AMR is shaking, the ground is seen as obstacle
-      // float distance_y_2 = (*iter_y - obs._origin.y) * (*iter_y - obs._origin.y);      
-      if (*iter_z < 0.08 && distance_2 > 0.5){
-        continue;
-      }
       
       if (distance_2 > mark_range_2 || distance_2 < 0.0001) {
         continue;

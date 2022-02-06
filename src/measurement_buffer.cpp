@@ -50,7 +50,7 @@ using namespace std::chrono_literals;
 MeasurementBuffer::MeasurementBuffer(
   const std::string & topic_name, const double & observation_keep_time,
   const double & expected_update_rate, const double & min_obstacle_height,
-  const double & max_obstacle_height, const double & obstacle_range,
+  const double & max_obstacle_height, const double & min_base_link_distance, const double & obstacle_range,
   tf2_ros::Buffer & tf, const std::string & global_frame,
   const std::string & sensor_frame, const double & tf_tolerance,
   const double & min_d, const double & max_d, const double & vFOV,
@@ -66,7 +66,7 @@ MeasurementBuffer::MeasurementBuffer(
   _last_updated(clock->now()),
   _global_frame(global_frame), _sensor_frame(sensor_frame),
   _topic_name(topic_name), _min_obstacle_height(min_obstacle_height),
-  _max_obstacle_height(max_obstacle_height), _obstacle_range(obstacle_range),
+  _max_obstacle_height(max_obstacle_height), _min_base_link_distance(min_base_link_distance), _obstacle_range(obstacle_range),
   _tf_tolerance(tf_tolerance), _min_z(min_d), _max_z(max_d),
   _vertical_fov(vFOV), _vertical_fov_padding(vFOVPadding),
   _horizontal_fov(hFOV), _decay_acceleration(decay_acceleration),
@@ -135,13 +135,47 @@ void MeasurementBuffer::BufferROSCloud(
       return;
     }
 
+
     // transform the cloud in the global frame
     point_cloud_ptr cld_global(new sensor_msgs::msg::PointCloud2());
-    geometry_msgs::msg::TransformStamped tf_stamped =
-      _buffer.lookupTransform(
+    
+    if (_min_base_link_distance > 0.0){
+      // transform the cloud to the AMR frame
+      point_cloud_ptr cld_local(new sensor_msgs::msg::PointCloud2());
+
+      geometry_msgs::msg::TransformStamped tf_stamped_base_link =
+        _buffer.lookupTransform(
+        "base_link", cloud.header.frame_id,
+        tf2_ros::fromMsg(cloud.header.stamp));
+      tf2::doTransform(cloud, *cld_local, tf_stamped_base_link);
+
+      // remove detections of the AMR frame
+      pcl::PCLPointCloud2::Ptr cloud_pcl_local(new pcl::PCLPointCloud2());
+      pcl::PCLPointCloud2::Ptr cloud_local_filtered(new pcl::PCLPointCloud2());    
+
+      pcl_conversions::toPCL(*cld_local, *cloud_pcl_local);
+      pcl::PassThrough<pcl::PCLPointCloud2> pass_through_filter_local;
+      pass_through_filter_local.setInputCloud(cloud_pcl_local);
+      pass_through_filter_local.setKeepOrganized(false);
+      pass_through_filter_local.setFilterFieldName("x");
+      pass_through_filter_local.setFilterLimits(
+        _min_base_link_distance, 100.0);
+      pass_through_filter_local.filter(*cloud_local_filtered);
+      pcl_conversions::fromPCL(*cloud_local_filtered, *cld_local);
+
+      geometry_msgs::msg::TransformStamped tf_stamped =
+        _buffer.lookupTransform(
+        _global_frame, "base_link",
+        tf2_ros::fromMsg(cloud.header.stamp));
+      tf2::doTransform(*cld_local, *cld_global, tf_stamped);
+    } else {
+
+      geometry_msgs::msg::TransformStamped tf_stamped =
+        _buffer.lookupTransform(
       _global_frame, cloud.header.frame_id,
       tf2_ros::fromMsg(cloud.header.stamp));
-    tf2::doTransform(cloud, *cld_global, tf_stamped);
+      tf2::doTransform(cloud, *cld_global, tf_stamped);
+    }
 
     pcl::PCLPointCloud2::Ptr cloud_pcl(new pcl::PCLPointCloud2());
     pcl::PCLPointCloud2::Ptr cloud_filtered(new pcl::PCLPointCloud2());
